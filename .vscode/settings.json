@@ -1,0 +1,14 @@
+{
+  // Use the project's virtual environment (it has Dash, pandas, etc.)
+  "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+
+  // Make Code Runner's ▷ button use the venv too, instead of the global Python
+  "code-runner.executorMap": {
+    "python": "\"$workspaceRoot\\.venv\\Scripts\\python.exe\" -u"
+  },
+  "code-runner.runInTerminal": true,
+
+  // This is a Python project: stop the Java extensions from importing anything
+  "java.import.maven.enabled": false,
+  "java.import.gradle.enabled": false
+}

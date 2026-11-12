@@ -1,0 +1,4 @@
+.venv/
+__pycache__/
+# Kaggle download cache; data/T1.csv itself is committed so the app runs from a fresh clone
+data/raw/

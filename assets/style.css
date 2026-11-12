@@ -1,0 +1,156 @@
+/* Wind Turbine Performance Dashboard
+ * Tokens first; components reference roles, never raw hex.
+ * Layout: header / [sidebar | KPI row + chart grid], collapsing to one column on narrow screens.
+ */
+:root {
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-secondary: #52514e;
+  --muted: #898781;
+  --hairline: rgba(11, 11, 11, 0.10);
+  --grid: #e1e0d9;
+  --accent: #2a78d6;
+  --radius: 10px;
+  --gap: 16px;
+  --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+h1, h2, h3, p { margin: 0; }
+
+.app { max-width: 1600px; margin: 0 auto; padding: 20px var(--gap) 32px; }
+
+/* --- Header ------------------------------------------------------------ */
+.app-header {
+  display: flex; flex-wrap: wrap; gap: 8px 24px;
+  align-items: flex-end; justify-content: space-between;
+  margin-bottom: var(--gap);
+}
+.app-header h1 { font-size: 22px; font-weight: 650; letter-spacing: -0.01em; }
+.subtitle { color: var(--ink-secondary); margin-top: 2px; }
+.reading-count { color: var(--ink-secondary); font-variant-numeric: tabular-nums; }
+
+/* --- Body grid ---------------------------------------------------------- */
+.app-body {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: var(--gap);
+  align-items: start;
+}
+.main { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
+
+/* --- Sidebar (enclosure groups all filters) ----------------------------- */
+.sidebar {
+  position: sticky; top: 16px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex; flex-direction: column; gap: 20px;
+}
+.sidebar-header { display: flex; align-items: center; justify-content: space-between; }
+.sidebar-header h2 { font-size: 15px; font-weight: 600; }
+.filter-group h3 {
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--muted); margin-bottom: 8px;
+}
+.help { display: block; font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+.reset-button {
+  font: inherit; font-size: 12px; font-weight: 500;
+  color: var(--ink-secondary); background: transparent;
+  border: 1px solid var(--hairline); border-radius: 6px;
+  padding: 4px 10px; cursor: pointer;
+}
+.reset-button:hover { background: var(--page); color: var(--ink); }
+.reset-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.sector-checklist { display: grid; grid-template-columns: 1fr; gap: 2px 8px; }
+.sector-checklist label { display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 2px 0; }
+.sector-option { display: inline-flex; align-items: center; gap: 6px; }
+.swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.sector-code { font-weight: 600; min-width: 20px; }
+.sector-name { color: var(--muted); font-size: 12px; }
+
+.perf-mode label { display: flex; align-items: center; gap: 6px; padding: 2px 0; cursor: pointer; }
+.perf-mode { margin-bottom: 8px; }
+
+.how-to ul { margin: 0; padding-left: 18px; color: var(--ink-secondary); font-size: 12px; }
+.how-to li + li { margin-top: 4px; }
+
+/* --- KPI row (proximity: four related numbers in one band) --------------- */
+.kpi-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--gap); }
+.kpi {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.kpi-label { font-size: 12px; color: var(--ink-secondary); }
+.kpi-value { font-size: 26px; font-weight: 650; letter-spacing: -0.01em; }
+.kpi-hint { font-size: 11px; color: var(--muted); }
+
+/* --- Chart cards -------------------------------------------------------- */
+.chart-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: var(--gap);
+}
+.card-line { grid-column: 1 / -1; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  padding: 14px 12px 6px;
+  min-width: 0;
+}
+.card-header {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  padding: 0 4px 4px;
+}
+.card-header h2 { font-size: 15px; font-weight: 600; }
+.card-subtitle { font-size: 12px; color: var(--muted); }
+
+/* Responsive graphs fill 100% of their parent, so the wrapper carries the height. */
+.graph-box { width: 100%; height: 300px; }
+.graph-box-tall { height: 420px; }
+
+/* Segmented toggle for the bar metric */
+.segmented {
+  display: inline-flex; border: 1px solid var(--hairline); border-radius: 6px;
+  overflow: hidden; flex: none;
+}
+.segmented label {
+  display: inline-flex; align-items: center; margin: 0;
+  padding: 3px 10px; font-size: 12px; color: var(--ink-secondary); cursor: pointer;
+}
+.segmented label + label { border-left: 1px solid var(--hairline); }
+.segmented input { position: absolute; opacity: 0; pointer-events: none; }
+.segmented label:has(input:checked) { background: var(--page); color: var(--ink); font-weight: 600; }
+.segmented label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* --- Responsive --------------------------------------------------------- */
+@media (max-width: 1200px) {
+  .chart-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 860px) {
+  .app-body { grid-template-columns: minmax(0, 1fr); }
+  .sidebar { position: static; }
+  .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpi-value { font-size: 21px; }
+  .sector-checklist { grid-template-columns: 1fr 1fr; }
+  .graph-box-tall { height: 360px; }
+}
