@@ -3,7 +3,7 @@
 Interactive Plotly Dash dashboard for the [Wind Turbine SCADA dataset](https://www.kaggle.com/datasets/berkerisen/wind-turbine-scada-dataset).
 It has three linked views (power curve, sector bars, monthly trend) with cross-filtering and a KPI row.
 
-**Live prototype:** _Render link, added after deployment_
+**Live prototype:** https://wind-turbine-dashboard.onrender.com
 (The free host sleeps when idle, so the first load can take about a minute.)
 
 **Repository:** https://github.com/rohithanbu/wind-turbine-dashboard
