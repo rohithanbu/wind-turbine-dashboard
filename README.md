@@ -55,25 +55,6 @@ Then open **http://127.0.0.1:8050** in a browser. Press `Ctrl+C` in the terminal
 | RQ2 | Which wind direction sectors consistently yield the highest power generation, and does this efficiency change across different months? | **Output by wind direction** bars, linked to the **Monthly trend** line (one line per selected sector) |
 | RQ3 | When cross-filtering by low-performance periods, do anomalies appear in the theoretical vs actual power curve? | **Performance** filter ("Underperforming only") applied to all three views and the KPI row |
 
-### Definitions
-
-These clarify terms used in the research questions (following feedback on the proposal):
-
-- **Theoretical power** is a column *supplied in the dataset* (`Theoretical_Power_Curve`). According to the dataset
-  description, it is the power the turbine should produce at the measured wind speed, taken from the manufacturer's
-  power curve. It is not computed in this project. The CSV header labels it "KWh", but its values (0–3,600) are on the
-  same scale as active power, so it is treated as **kW**.
-- **Active power** is the power the turbine actually produced in each 10-minute reading (kW).
-- **Efficiency** means **actual ÷ theoretical power**, calculated from the data, not an external figure. It is only
-  computed where theoretical power is at least 100 kW, because below cut-in the ratio is meaningless.
-- **"Peak efficiency before the curve flattens" (RQ1)** is measured from the data in two ways:
-  - **Plateau point:** the wind speed where the median active power (in 0.5 m/s bins) first reaches 95% of its
-    maximum. This is where extra wind stops adding output. It is shown as the dotted "Plateau" line.
-  - **Closest to spec:** the wind-speed range where actual ÷ theoretical is highest.
-
-  It is not a local maximum of a single reading, and not a manufacturer-reported value.
-- **Underperforming (RQ3):** a reading where actual ÷ theoretical is below 70%. The threshold is adjustable from 50–95%.
-
 ## Findings
 
 All figures are computed from the full 2018 dataset. The **"See it in the dashboard"** steps reproduce each one.
