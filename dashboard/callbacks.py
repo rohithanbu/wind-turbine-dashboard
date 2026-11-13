@@ -15,7 +15,7 @@ from __future__ import annotations
 from dash import Dash, Input, Output, State, ctx
 from dash.exceptions import PreventUpdate
 
-from .config import SECTORS
+from .config import DEFAULT_PERF_THRESHOLD, SECTORS
 from .data import Filters, load_data, theoretical_curve
 from .figures import bar_figure, compute_kpis, line_figure, scatter_figure
 
@@ -110,6 +110,16 @@ def register_callbacks(app: Dash) -> None:
     )
     def toggle_threshold(mode):
         return mode == "all"
+
+    @app.callback(
+        Output("perf-mode", "value"),
+        Output("perf-threshold", "value"),
+        Input("reset-button", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def reset_performance(_reset):
+        """'Reset all' also returns the performance filter to its defaults."""
+        return "all", round(DEFAULT_PERF_THRESHOLD * 100)
 
     # --- Filter state -> views --------------------------------------------
 
