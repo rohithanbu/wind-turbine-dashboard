@@ -2,7 +2,7 @@
 
 Data flow (one source of truth per filter):
 
-    bar click ───────────► sector-filter (Checklist)  ┐
+    wind-rose click ─────► sector-filter (Checklist)  ┐
     line click / brush ──► month-filter (RangeSlider) ├─► every figure + KPIs
     scatter brush ───────► scatter-range (Store)      │
     perf-mode / threshold (sidebar) ──────────────────┘
@@ -15,9 +15,9 @@ from __future__ import annotations
 from dash import Dash, Input, Output, State, ctx
 from dash.exceptions import PreventUpdate
 
-from .config import DEFAULT_PERF_THRESHOLD, SECTORS
+from .config import DEFAULT_PERF_THRESHOLD, LOW_COUNT_WARNING, SECTORS
 from .data import Filters, load_data, theoretical_curve
-from .figures import bar_figure, compute_kpis, line_figure, scatter_figure
+from .figures import compute_kpis, line_figure, rose_figure, scatter_figure
 
 # The full filter state, in Filters.from_inputs argument order.
 FILTER_INPUTS = [
@@ -60,22 +60,22 @@ def register_callbacks(app: Dash) -> None:
 
     @app.callback(
         Output("sector-filter", "value"),
-        Output("bar-chart", "clickData"),
-        Input("bar-chart", "clickData"),
+        Output("rose-chart", "clickData"),
+        Input("rose-chart", "clickData"),
         Input("reset-button", "n_clicks"),
         State("sector-filter", "value"),
         prevent_initial_call=True,
     )
     def toggle_sector(click, _reset, current):
-        """Clicking a bar toggles that sector in the sidebar checklist."""
+        """Clicking a wind-rose wedge toggles that sector in the sidebar checklist."""
         if ctx.triggered_id == "reset-button":
             return [], None
         if not click:
             raise PreventUpdate
-        sector = click["points"][0]["x"]
+        sector = click["points"][0]["customdata"][0]
         chosen = set(current or [])
         chosen ^= {sector}
-        # Clearing clickData lets the same bar be clicked twice in a row.
+        # Clearing clickData lets the same wedge be clicked twice in a row.
         return [s for s in SECTORS if s in chosen], None
 
     @app.callback(
@@ -131,9 +131,9 @@ def register_callbacks(app: Dash) -> None:
             raise PreventUpdate
         filters = Filters.from_inputs(sectors, months, scatter_range, perf_mode, threshold)
         view = filters.without("scatter").without("sector").apply(df)
-        # A plateau computed from underperforming readings alone isn't the turbine's curve.
+        # A median or plateau of underperforming readings alone isn't the turbine's curve.
         return scatter_figure(view, curve, filters.sectors, scatter_range,
-                              show_plateau=filters.perf_mode != "under")
+                              show_summary=filters.perf_mode != "under")
 
     @app.callback(Output("line-chart", "figure"), *FILTER_INPUTS)
     def update_line(sectors, months, scatter_range, perf_mode, threshold):
@@ -142,11 +142,11 @@ def register_callbacks(app: Dash) -> None:
         view = filters.without("month").without("sector").apply(df)
         return line_figure(view, filters.sectors, filters.months)
 
-    @app.callback(Output("bar-chart", "figure"), *FILTER_INPUTS, Input("bar-metric", "value"))
-    def update_bar(sectors, months, scatter_range, perf_mode, threshold, metric):
+    @app.callback(Output("rose-chart", "figure"), *FILTER_INPUTS, Input("rose-metric", "value"))
+    def update_rose(sectors, months, scatter_range, perf_mode, threshold, metric):
         filters = Filters.from_inputs(sectors, months, scatter_range, perf_mode, threshold)
         view = filters.without("sector").apply(df)
-        return bar_figure(view, filters.sectors, metric)
+        return rose_figure(view, filters.sectors, metric)
 
     @app.callback(
         Output("kpi-energy", "children"),
@@ -154,6 +154,7 @@ def register_callbacks(app: Dash) -> None:
         Output("kpi-active", "children"),
         Output("kpi-efficiency", "children"),
         Output("reading-count", "children"),
+        Output("reading-count", "className"),
         *FILTER_INPUTS,
     )
     def update_kpis(sectors, months, scatter_range, perf_mode, threshold):
@@ -161,4 +162,11 @@ def register_callbacks(app: Dash) -> None:
         view = Filters.from_inputs(sectors, months, scatter_range, perf_mode, threshold).apply(df)
         kpis = compute_kpis(view)
         count = f"Showing {len(view):,} of {len(df):,} readings"
-        return kpis["energy"], kpis["max_wind"], kpis["active"], kpis["efficiency"], count
+        css = "reading-count"
+        # Empty state: say so plainly instead of leaving a near-empty dashboard unexplained.
+        if view.empty:
+            count, css = "No readings match the current filters. Use Reset all to start over.", css + " is-warning"
+        elif len(view) < LOW_COUNT_WARNING:
+            count += " (very few match the current filters, so results may not be representative; use Reset all to see the full year)"
+            css += " is-warning"
+        return kpis["energy"], kpis["max_wind"], kpis["active"], kpis["efficiency"], count, css

@@ -4,9 +4,7 @@ from __future__ import annotations
 import pandas as pd
 from dash import dcc, html
 
-from .config import (
-    DEFAULT_PERF_THRESHOLD, MONTH_LABELS, SECTOR_COLORS, SECTOR_NAMES, SECTORS,
-)
+from .config import DEFAULT_PERF_THRESHOLD, MONTH_LABELS, SECTOR_NAMES, SECTORS
 
 # Shared Plotly config: no logo, only the tools each view actually needs.
 GRAPH_CONFIG = {"displaylogo": False, "responsive": True}
@@ -39,7 +37,6 @@ def _filter_group(title: str, *children) -> html.Div:
 def _sidebar() -> html.Aside:
     sector_options = [
         {"label": html.Span(className="sector-option", children=[
-            html.Span(className="swatch", style={"backgroundColor": SECTOR_COLORS[s]}),
             html.Span(f"{s}", className="sector-code"),
             html.Span(SECTOR_NAMES[s], className="sector-name"),
         ]), "value": s}
@@ -54,7 +51,8 @@ def _sidebar() -> html.Aside:
             "Wind direction",
             dcc.Checklist(id="sector-filter", options=sector_options, value=[],
                           className="sector-checklist"),
-            html.P("None checked = all sectors. Clicking a bar toggles it too.", className="help"),
+            html.P("None checked = all sectors. Clicking a wedge on the wind rose toggles it too.",
+                   className="help"),
         ),
         _filter_group(
             "Months",
@@ -83,7 +81,7 @@ def _sidebar() -> html.Aside:
             html.H3("How to explore"),
             html.Ul([
                 html.Li("Drag a box on the power curve to brush a wind-speed / power range."),
-                html.Li("Click a bar to highlight a direction sector in every view."),
+                html.Li("Click a wedge on the wind rose to highlight that direction in every view."),
                 html.Li("Drag across months, or click one, to focus a period."),
                 html.Li("Double-click a chart to clear its brush."),
             ]),
@@ -122,11 +120,11 @@ def build_layout(df: pd.DataFrame) -> html.Div:
                                     config={**GRAPH_CONFIG,
                                             "modeBarButtonsToRemove": ["lasso2d", "autoScale2d"]}),
                           class_name="card-scatter", tall=True),
-                    _card("Output by wind direction", "Click a bar to select a sector",
-                          dcc.Graph(id="bar-chart",
+                    _card("Output by wind direction", "Wind rose · click a wedge to select a sector",
+                          dcc.Graph(id="rose-chart",
                                     config={**GRAPH_CONFIG, "displayModeBar": False}),
                           controls=dcc.RadioItems(
-                              id="bar-metric", value="mean", inline=True, className="segmented",
+                              id="rose-metric", value="mean", inline=True, className="segmented",
                               options=[{"label": "Mean kW", "value": "mean"},
                                        {"label": "Energy", "value": "energy"}]),
                           class_name="card-bar", tall=True),

@@ -13,6 +13,7 @@ DATA_FILE = ROOT_DIR / "data" / "T1.csv"
 COLUMNS = ["timestamp", "active_power", "wind_speed", "theoretical_power", "wind_direction"]
 
 INTERVAL_HOURS = 10 / 60  # SCADA logs one row every 10 minutes
+RATED_POWER_KW = 3600     # the turbine's maximum output; fixes the power axes
 
 # --- Wind direction sectors -------------------------------------------------
 # Eight 45° compass sectors, each centred on its heading (N = 337.5°-22.5°).
@@ -36,13 +37,16 @@ DEFAULT_PERF_THRESHOLD = 0.70
 # The scatter draws at most this many points (a fixed random sample) so updates
 # stay fast; filters and KPIs always use the full data.
 MAX_SCATTER_POINTS = 15_000
-# The scatter only gives each highlighted sector its own hue for up to 3 sectors:
-# beyond that, overlapping dots can't be told apart reliably by colour-blind readers.
+# Selected sectors only get their own hue for up to 3 sectors: beyond that, the hues
+# can't be told apart reliably by colour-blind readers, so the selection shares one colour.
 MAX_HUED_SECTORS = 3
+# Below this many matching readings the header warns that the results may be unrepresentative.
+LOW_COUNT_WARNING = 500
 
 # --- Colour system ----------------------------------------------------------
 # Categorical slots in fixed order (validated for colour-vision deficiency on
-# adjacent pairs). N takes slot 1 (blue), so "North" is blue everywhere.
+# adjacent pairs), used only for *selected* sectors - unselected data stays neutral.
+# N takes slot 1 (blue), so a selected "North" is blue everywhere.
 SECTOR_COLORS = dict(zip(SECTORS, [
     "#2a78d6",  # N  blue
     "#eb6834",  # NE orange

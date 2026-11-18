@@ -4,13 +4,12 @@ No Dash imports here - these functions are easy to test or reuse in a notebook.
 """
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
 from .config import (
     COLORS, FONT_FAMILY, INTERVAL_HOURS, MAX_HUED_SECTORS, MAX_SCATTER_POINTS,
-    MONTH_LABELS, SECTOR_COLORS, SECTOR_NAMES, SECTORS,
+    MONTH_LABELS, RATED_POWER_KW, SECTOR_COLORS, SECTOR_NAMES, SECTORS,
 )
 
 
@@ -40,7 +39,7 @@ def _base_layout(fig: go.Figure, *, x_title: str, y_title: str) -> go.Figure:
     return fig
 
 
-def empty_figure(message: str = "No readings match the current filters") -> go.Figure:
+def empty_figure(message: str = "No readings match the current filters · use Reset all") -> go.Figure:
     """Placeholder figure shown when the filters leave nothing to plot."""
     fig = _base_layout(go.Figure(), x_title="", y_title="")
     fig.update_xaxes(visible=False)
@@ -50,7 +49,26 @@ def empty_figure(message: str = "No readings match the current filters") -> go.F
     return fig
 
 
+def selection_colors(selected: tuple[str, ...]) -> dict[str, str]:
+    """Colour for each selected sector, shared by every view.
+
+    Nothing is hued by default (one neutral colour plus a highlight). Selected sectors
+    take their fixed hue, so a sector looks the same everywhere; beyond MAX_HUED_SECTORS
+    the hues stop being reliably distinguishable, so the selection shares one ink colour.
+    """
+    if len(selected) <= MAX_HUED_SECTORS:
+        return {s: SECTOR_COLORS[s] for s in selected}
+    return {s: COLORS["ink_secondary"] for s in selected}
+
+
 # --- Scatter: power curve ---------------------------------------------------
+
+def binned_median(df: pd.DataFrame, bin_width: float = 0.5, min_count: int = 20) -> pd.Series:
+    """Median active power per wind-speed bin, skipping sparse bins."""
+    bins = (df["wind_speed"] / bin_width).round() * bin_width
+    grouped = df.groupby(bins)["active_power"]
+    return grouped.median()[grouped.size() >= min_count]
+
 
 def plateau_wind_speed(df: pd.DataFrame, bin_width: float = 0.5) -> float | None:
     """Wind speed where the median power curve first reaches 95% of its peak.
@@ -59,9 +77,7 @@ def plateau_wind_speed(df: pd.DataFrame, bin_width: float = 0.5) -> float | None
     """
     if len(df) < 500:
         return None
-    bins = (df["wind_speed"] / bin_width).round() * bin_width
-    grouped = df.groupby(bins)["active_power"]
-    medians = grouped.median()[grouped.size() >= 20]  # ignore sparse bins
+    medians = binned_median(df, bin_width)
     if medians.empty or medians.max() <= 0:
         return None
     return float(medians[medians >= 0.95 * medians.max()].index.min())
@@ -69,11 +85,12 @@ def plateau_wind_speed(df: pd.DataFrame, bin_width: float = 0.5) -> float | None
 
 def scatter_figure(df: pd.DataFrame, theoretical: pd.DataFrame,
                    highlight: tuple[str, ...], selection: dict | None,
-                   show_plateau: bool = True) -> go.Figure:
+                   show_summary: bool = True) -> go.Figure:
     """Wind speed (x) vs active power (y), with the theoretical curve overlaid.
 
-    Highlighted sectors take their categorical hue; everything else recedes to a
-    neutral context colour so the power-curve shape stays visible.
+    The points are small and translucent so dense regions read darker; a binned median
+    line and the plateau marker summarise the actual curve (``show_summary``). Highlighted
+    sectors take their selection colour; everything else recedes to a neutral context colour.
     """
     if df.empty:
         return empty_figure()
@@ -86,35 +103,52 @@ def scatter_figure(df: pd.DataFrame, theoretical: pd.DataFrame,
         return go.Scattergl(
             x=frame["wind_speed"].round(2), y=frame["active_power"].round(1),
             customdata=frame["sector"], mode="markers", name=name,
-            marker=dict(size=5, color=color, opacity=opacity, line=dict(width=0)),
+            marker=dict(size=4, color=color, opacity=opacity, line=dict(width=0)),
             hovertemplate=hover,
         )
 
     fig = go.Figure()
     if not highlight:
-        fig.add_trace(points(sample, "Readings", COLORS["muted"], 0.35))
+        fig.add_trace(points(sample, "Readings", COLORS["muted"], 0.2))
+        median_source, median_name = df, "Median actual"
     else:
         is_hl = sample["sector"].isin(highlight)
-        fig.add_trace(points(sample[~is_hl], "Other sectors", COLORS["context"], 0.3))
+        fig.add_trace(points(sample[~is_hl], "Other sectors", COLORS["context"], 0.2))
+        colors = selection_colors(highlight)
         if len(highlight) <= MAX_HUED_SECTORS:
             for sector in highlight:
                 fig.add_trace(points(sample[sample["sector"] == sector],
-                                     SECTOR_NAMES[sector], SECTOR_COLORS[sector], 0.75))
+                                     SECTOR_NAMES[sector], colors[sector], 0.55))
         else:
-            # Too many hues to separate reliably on overlapping dots: one highlight colour.
             fig.add_trace(points(sample[is_hl], f"Selected sectors ({len(highlight)})",
-                                 COLORS["ink"], 0.6))
+                                 colors[highlight[0]], 0.3))
+        median_source, median_name = df[df["sector"].isin(highlight)], "Median actual (selected)"
 
     fig.add_trace(go.Scatter(
         x=theoretical["wind_speed"], y=theoretical["theoretical_power"],
         mode="lines", name="Theoretical curve",
-        line=dict(color=COLORS["ink"], width=2, dash="dash"),
+        line=dict(color=COLORS["ink_secondary"], width=2, dash="dash"),
         hovertemplate="Theoretical %{y:,.0f} kW at %{x:.1f} m/s<extra></extra>",
     ))
+    medians = binned_median(median_source) if show_summary else pd.Series(dtype=float)
+    if not medians.empty:
+        # A light halo keeps the median line readable on top of dense points.
+        fig.add_trace(go.Scatter(
+            x=medians.index, y=medians.round(0), mode="lines", showlegend=False, hoverinfo="skip",
+            line=dict(color=COLORS["surface"], width=6),
+        ))
+        fig.add_trace(go.Scatter(
+            x=medians.index, y=medians.round(0), mode="lines", name=median_name,
+            line=dict(color=COLORS["ink"], width=2.5),
+            hovertemplate="Median actual %{y:,.0f} kW at %{x:.1f} m/s<extra></extra>",
+        ))
 
     _base_layout(fig, x_title="Wind speed (m/s)", y_title="Active power (kW)")
+    # Fixed domains so the axes don't jump when other views change the filters.
+    fig.update_xaxes(range=[0, 26])
+    fig.update_yaxes(range=[-150, RATED_POWER_KW + 250])
 
-    plateau = plateau_wind_speed(df) if show_plateau else None
+    plateau = plateau_wind_speed(df) if show_summary else None
     if plateau is not None:
         fig.add_vline(x=plateau, line=dict(color=COLORS["muted"], width=1, dash="dot"),
                       annotation=dict(text=f"Plateau ≈ {plateau:g} m/s", font_size=11,
@@ -141,39 +175,64 @@ def line_figure(df: pd.DataFrame, sectors: tuple[str, ...],
                 months: tuple[int, int]) -> go.Figure:
     """Mean active power per month; one line per selected sector, else overall.
 
-    The selected month range is shown as a shaded band (the brush).
+    The y-axis is fixed at 0 to rated power so lines stay comparable across selections.
+    Months with no matching readings are marked with an × on the baseline instead of
+    leaving an unexplained gap. The selected month range is shown as a shaded band.
     """
     if df.empty:
         return empty_figure()
 
     all_months = pd.RangeIndex(1, 13, name="month")
     fig = go.Figure()
+    any_missing = False
 
-    def monthly_line(series: pd.Series, name: str, color: str, dash: str = "solid") -> go.Scatter:
+    def monthly_line(series: pd.Series, name: str, color: str, dash: str = "solid") -> None:
+        nonlocal any_missing
         y = series.reindex(all_months)
-        return go.Scatter(
+        fig.add_trace(go.Scatter(
             x=list(all_months), y=y.round(1), name=name, mode="lines+markers",
             line=dict(color=color, width=2, dash=dash),
             marker=dict(size=8, color=color, line=dict(color=COLORS["surface"], width=2)),
             hovertemplate=f"{name}: %{{y:,.0f}} kW<extra></extra>",
-        )
+        ))
+        missing = [m for m in all_months if pd.isna(y[m])]
+        if missing:
+            any_missing = True
+            fig.add_trace(go.Scatter(
+                x=missing, y=[0] * len(missing), mode="markers", showlegend=False,
+                marker=dict(symbol="x-thin", size=10, color=color, line=dict(color=color, width=2)),
+                hovertemplate=f"{name}: no matching readings<extra></extra>",
+            ))
 
-    by_month = df.groupby("month")
     if sectors:
-        for sector in sectors:
-            subset = df[df["sector"] == sector]
-            fig.add_trace(monthly_line(subset.groupby("month")["active_power"].mean(),
-                                       SECTOR_NAMES[sector], SECTOR_COLORS[sector]))
         theoretical = df[df["sector"].isin(sectors)].groupby("month")["theoretical_power"].mean()
+        if len(sectors) <= MAX_HUED_SECTORS:
+            colors = selection_colors(sectors)
+            for sector in sectors:
+                subset = df[df["sector"] == sector]
+                monthly_line(subset.groupby("month")["active_power"].mean(),
+                             SECTOR_NAMES[sector], colors[sector])
+        else:
+            # Too many lines to tell apart: show the selection as one combined line.
+            selected = df[df["sector"].isin(sectors)]
+            monthly_line(selected.groupby("month")["active_power"].mean(),
+                         f"Selected sectors ({len(sectors)})", selection_colors(sectors)[sectors[0]])
     else:
-        fig.add_trace(monthly_line(by_month["active_power"].mean(), "Actual", COLORS["ink"]))
+        by_month = df.groupby("month")
+        monthly_line(by_month["active_power"].mean(), "Actual", COLORS["ink"])
         theoretical = by_month["theoretical_power"].mean()
-    fig.add_trace(monthly_line(theoretical, "Theoretical", COLORS["muted"], dash="dash"))
+    monthly_line(theoretical, "Theoretical", COLORS["muted"], dash="dash")
 
     _base_layout(fig, x_title="Month (2018)", y_title="Mean active power (kW)")
     fig.update_xaxes(tickmode="array", tickvals=list(all_months), ticktext=MONTH_LABELS,
                      range=[0.5, 12.5], showgrid=False)
-    fig.update_yaxes(fixedrange=True, rangemode="tozero")
+    # Fixed 0-to-rated-power domain (a little below 0 so the × markers aren't clipped).
+    fig.update_yaxes(fixedrange=True, range=[-150, RATED_POWER_KW])
+
+    if any_missing:
+        fig.add_annotation(text="× = no matching readings that month", showarrow=False,
+                           xref="paper", yref="paper", x=1, y=1.02, xanchor="right", yanchor="bottom",
+                           font=dict(size=11, color=COLORS["muted"]))
 
     if tuple(months) != (1, 12):
         fig.add_vrect(x0=months[0] - 0.5, x1=months[1] + 0.5, fillcolor=COLORS["brush"],
@@ -184,7 +243,7 @@ def line_figure(df: pd.DataFrame, sectors: tuple[str, ...],
     return fig
 
 
-# --- Bar: wind direction sectors --------------------------------------------
+# --- Wind rose: output by direction sector ----------------------------------
 
 def sector_summary(df: pd.DataFrame) -> pd.DataFrame:
     """Per-sector mean power, energy and share of time, in compass order."""
@@ -196,38 +255,60 @@ def sector_summary(df: pd.DataFrame) -> pd.DataFrame:
     return g
 
 
-def bar_figure(df: pd.DataFrame, selected: tuple[str, ...], metric: str) -> go.Figure:
-    """One bar per compass sector, each in its fixed sector hue.
+def rose_figure(df: pd.DataFrame, selected: tuple[str, ...], metric: str) -> go.Figure:
+    """Wind rose: one wedge per compass sector, N at the top, clockwise.
 
-    Unselected sectors fade when a selection exists, so the selection reads at a glance.
+    Direction is circular, so angle encodes the sector and radius the output. All wedges
+    share one neutral colour; selected sectors take their selection colour and the rest fade.
     """
     if df.empty:
         return empty_figure()
 
     summary = sector_summary(df)
     if metric == "energy":
-        y, y_title = summary["energy_mwh"], "Energy generated (MWh)"
+        r, r_label = summary["energy_mwh"], "Radius: energy generated (MWh)"
     else:
-        y, y_title = summary["mean_kw"].fillna(0), "Mean active power (kW)"
+        r, r_label = summary["mean_kw"].fillna(0), "Radius: mean active power (kW)"
 
-    opacity = [1.0 if not selected or s in selected else 0.3 for s in SECTORS]
-    customdata = np.column_stack([
-        [SECTOR_NAMES[s] for s in SECTORS], summary["mean_kw"].fillna(0),
+    colors = selection_colors(selected)
+    if selected:
+        wedge_colors = [colors.get(s, COLORS["context"]) for s in SECTORS]
+    else:
+        wedge_colors = [COLORS["muted"]] * len(SECTORS)
+    customdata = list(zip(
+        SECTORS, [SECTOR_NAMES[s] for s in SECTORS], summary["mean_kw"].fillna(0),
         summary["energy_mwh"], summary["share"] * 100,
-    ])
-
-    fig = go.Figure(go.Bar(
-        x=SECTORS, y=y.round(1), customdata=customdata,
-        marker=dict(color=[SECTOR_COLORS[s] for s in SECTORS], opacity=opacity,
-                    cornerradius=4, line=dict(width=0)),
-        hovertemplate=("<b>%{customdata[0]}</b><br>Mean power %{customdata[1]:,.0f} kW"
-                       "<br>Energy %{customdata[2]:,.0f} MWh"
-                       "<br>Time from this sector %{customdata[3]:.1f}%<extra></extra>"),
     ))
-    _base_layout(fig, x_title="Wind direction sector", y_title=y_title)
-    fig.update_xaxes(showgrid=False, fixedrange=True, tickfont=dict(color=COLORS["ink_secondary"]))
-    fig.update_yaxes(fixedrange=True, rangemode="tozero")
-    fig.update_layout(bargap=0.25, showlegend=False, dragmode=False)
+
+    fig = go.Figure(go.Barpolar(
+        r=r.round(1), theta=SECTORS, customdata=customdata,
+        marker=dict(color=wedge_colors, line=dict(color=COLORS["surface"], width=1.5)),
+        hovertemplate=("<b>%{customdata[1]}</b><br>Mean power %{customdata[2]:,.0f} kW"
+                       "<br>Energy %{customdata[3]:,.0f} MWh"
+                       "<br>Time from this sector %{customdata[4]:.1f}%<extra></extra>"),
+    ))
+    fig.update_layout(
+        template="none",
+        font=dict(family=FONT_FAMILY, color=COLORS["ink"], size=12),
+        paper_bgcolor=COLORS["surface"],
+        margin=dict(l=40, r=40, t=24, b=56),
+        hoverlabel=dict(bgcolor="white", bordercolor=COLORS["grid"],
+                        font=dict(family=FONT_FAMILY, color=COLORS["ink"], size=12)),
+        # Polar charts only report clicks when a drag mode is on (double-click resets a zoom).
+        showlegend=False, dragmode="zoom",
+        polar=dict(
+            bgcolor=COLORS["surface"], bargap=0.06,
+            angularaxis=dict(direction="clockwise", rotation=90, type="category",
+                             linecolor=COLORS["axis"], gridcolor=COLORS["grid"],
+                             tickfont=dict(color=COLORS["ink_secondary"], size=12)),
+            radialaxis=dict(angle=67.5, tickangle=67.5, linecolor=COLORS["axis"],
+                            gridcolor=COLORS["grid"], showline=False,
+                            tickfont=dict(color=COLORS["muted"], size=10), nticks=4),
+        ),
+        annotations=[dict(text=r_label, showarrow=False, xref="paper", yref="paper",
+                          x=0.5, y=-0.06, xanchor="center", yanchor="top",
+                          font=dict(size=11, color=COLORS["ink_secondary"]))],
+    )
     return fig
 
 

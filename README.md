@@ -1,7 +1,7 @@
 # Wind Turbine Performance Dashboard
 
 Interactive Plotly Dash dashboard for the [Wind Turbine SCADA dataset](https://www.kaggle.com/datasets/berkerisen/wind-turbine-scada-dataset).
-It has three linked views (power curve, sector bars, monthly trend) with cross-filtering and a KPI row.
+It has three linked views (power curve, wind rose, monthly trend) with cross-filtering and a KPI row.
 
 **Live prototype:** https://wind-turbine-dashboard.onrender.com
 (The free host sleeps when idle, so the first load can take about a minute.)
@@ -38,11 +38,11 @@ Then open **http://127.0.0.1:8050** in a browser. Press `Ctrl+C` in the terminal
 
 | Dimension | Source | Type | Used for |
 |---|---|---|---|
-| Active power (kW) | raw | Quantitative | Scatter y, bar length, line y, KPIs |
+| Active power (kW) | raw | Quantitative | Scatter y, wind-rose radius, line y, KPIs |
 | Wind speed (m/s) | raw | Quantitative | Scatter x, max-wind KPI |
 | Theoretical power (kW) | raw | Quantitative | Dashed reference curve, performance ratio |
 | Wind direction (°) | raw | Quantitative, binned into sectors | Sector (below) |
-| Wind direction sector (N … NW) | derived | Nominal (categorical) | Hue in all views, bar x |
+| Wind direction sector (N … NW) | derived | Nominal (categorical, circular order) | Wind-rose angle; hue for selected sectors in all views |
 | Timestamp | raw | Ordinal (time) | Header date range |
 | Month (Jan … Dec) | derived | Ordinal | Line x, month filter |
 | Performance ratio (actual ÷ theoretical) | derived | Quantitative | "Underperforming" filter, KPI |
@@ -52,7 +52,7 @@ Then open **http://127.0.0.1:8050** in a browser. Press `Ctrl+C` in the terminal
 | # | Research question | Answered by |
 |---|---|---|
 | RQ1 | How does active power correlate with wind speed, and at what wind speed does the turbine reach peak efficiency before the power curve flattens? | **Power curve** scatter (with theoretical curve and plateau marker) |
-| RQ2 | Which wind direction sectors consistently yield the highest power generation, and does this efficiency change across different months? | **Output by wind direction** bars, linked to the **Monthly trend** line (one line per selected sector) |
+| RQ2 | Which wind direction sectors consistently yield the highest power generation, and does this efficiency change across different months? | **Output by wind direction** wind rose, linked to the **Monthly trend** line (one line per selected sector) |
 | RQ3 | When cross-filtering by low-performance periods, do anomalies appear in the theoretical vs actual power curve? | **Performance** filter ("Underperforming only") applied to all three views and the KPI row |
 
 ## Findings
@@ -111,8 +111,8 @@ blows less often.
 - So the drop is driven by the *month*, not by the direction itself. That leads into RQ3.
 
 **See it in the dashboard:**
-1. Switch the bar chart between **Mean kW** and **Energy** to compare strength with total output.
-2. Click the **NE** bar, then the **S** bar. The monthly trend draws one line per selected sector against the
+1. Switch the wind rose between **Mean kW** and **Energy** to compare strength with total output.
+2. Click the **NE** wedge, then the **S** wedge. The monthly trend draws one line per selected sector against the
    theoretical line, showing the seasonal swap.
 
 ### RQ3: Do anomalies appear when filtering to low-performance periods?
@@ -150,7 +150,7 @@ maintenance. **The dataset has no fault or status codes**, so the cause can't be
 1. Select **Underperforming only**. The power curve shows the 0 kW line and the partial-output clusters below the
    dashed curve, and the actual ÷ theoretical KPI drops from 88% to 18%.
 2. Look at the monthly trend: the gap between actual and theoretical is largest in **January and December**.
-3. Drag a box around the partial-output points at 12+ m/s on the power curve. The bars and monthly trend update to
+3. Drag a box around the partial-output points at 12+ m/s on the power curve. The wind rose and monthly trend update to
    show which directions and months they came from.
 4. Use the threshold slider (50–95%) to test how sensitive the result is to the 70% cut-off.
 
@@ -172,20 +172,21 @@ All preparation is in [`dashboard/data.py`](dashboard/data.py):
 | Direction binning | Wind direction (0–360°) is binned into 8 compass sectors of 45° each (N, NE, … NW), each centred on its heading, so N covers 337.5°–22.5°. |
 | Performance ratio | `perf_ratio = active_power / theoretical_power`, computed only where theoretical power is at least 100 kW. Below cut-in the denominator is near zero and the ratio would be noise. Readings below 70% (adjustable from 50–95%) count as "underperforming". |
 | Negative power | The 57 negative readings are kept as-is in the charts and clipped to 0 when summing energy. |
-| Missing intervals | The 2,030 missing intervals are left as gaps, not interpolated; monthly figures are means of the readings that exist. |
-| Aggregation | The bar chart gives the per-sector mean power and energy (MWh = kW × 1/6 h ÷ 1000). The trend chart gives mean power per month. The theoretical curve is averaged into 0.5 m/s bins. The plateau marker is the wind speed where the binned median power first reaches 95% of its peak. It is hidden in "Underperforming only" mode, where it would not describe the turbine's curve. |
-| Scatter sampling | The scatter draws a fixed random sample of 15,000 points so the page stays responsive, and labels it as a sample on the chart. Filters, KPIs and the other views always use the full data. |
+| Missing intervals | The 2,030 missing intervals are left as gaps, not interpolated; monthly figures are means of the readings that exist. On the monthly trend, a month with no matching readings for a line is marked with an × on the baseline. |
+| Aggregation | The wind rose gives the per-sector mean power and energy (MWh = kW × 1/6 h ÷ 1000). The trend chart gives mean power per month. The theoretical curve is averaged into 0.5 m/s bins. The power curve's solid **median line** is the median active power per 0.5 m/s bin (bins with at least 20 readings). The plateau marker is the wind speed where that median first reaches 95% of its peak. The median line and plateau marker are hidden in "Underperforming only" mode, where they would not describe the turbine's curve. |
+| Scatter sampling | The scatter draws a fixed random sample of 15,000 small, translucent points so the page stays responsive and dense regions read darker. It is labelled as a sample on the chart. Filters, KPIs, the median line and the other views always use the full data. |
 
 ## Visual encodings
 
 | Data | Type | Mark | Channel | View |
 |---|---|---|---|---|
-| Active power | Quantitative | Point / bar / line | Y-position; bar length on a zero baseline | All three |
+| Active power | Quantitative | Point / wedge / line | Y-position (fixed 0 to rated power); wedge radius on the wind rose | All three |
+| Median active power | Quantitative (aggregated) | Line | Position, **solid** line over the points | Power curve |
 | Wind speed | Quantitative | Point | X-position | Power curve |
 | Theoretical power | Quantitative | Line | Position, **dashed** line style | Power curve, monthly trend |
-| Wind direction sector | Nominal | Point / bar / line | **Colour hue** (fixed per sector); x-position on the bar chart | All three |
+| Wind direction sector | Nominal, circular | Wedge | **Angle** (compass, N at the top, clockwise) | Wind rose |
+| Selected sectors | Nominal | Point / wedge / line | **Colour hue** (fixed per sector, up to 3; one shared colour beyond that); everything unselected stays neutral grey | All three |
 | Month | Ordinal | Line | X-position, left to right | Monthly trend |
-| Selection state | — | Point / bar | Saturation and opacity (unselected fades to grey) | Power curve, bars |
 
 ## Changes from the proposal
 
@@ -193,21 +194,24 @@ The channel justification table in the proposal is followed, with these changes:
 
 | Proposal | Implementation | Reason |
 |---|---|---|
-| Wind direction → **colour hue** on the scatter points | The scatter shows all points in a neutral grey by default. Hue appears only for the sectors the user selects (up to 3). With more than 3 selected, the selection shares one highlight colour. | Eight hues on ~50,000 overlapping points can't be told apart, especially by colour-blind viewers, and colour noise hides the power-curve shape that RQ1 asks about. Hue still conveys identity only (expressiveness), but only where it can be read. |
-| *(not in table)* | **New bar chart:** wind direction sector → **x-position** (compass order) plus the same hue; mean power or energy → **bar length** on a common zero baseline. | RQ2 compares sectors by magnitude. Position and length on a common scale are more effective than hue for that comparison (effectiveness). |
+| Wind direction → **colour hue** on the scatter points | Everything is one **neutral grey by default**. Hue appears only as a **highlight for the sectors the user selects** (up to 3), in every view; with more than 3 selected, the selection shares one colour. | Eight hues on ~50,000 overlapping points can't be told apart, especially by colour-blind viewers, and colour noise hides the power-curve shape that RQ1 asks about. One neutral hue plus a highlight keeps hue for identity only (expressiveness), and only where it can be read. |
+| *(not in table)* | **New wind rose:** wind direction sector → **angle** (compass layout, N at the top, clockwise); mean power or energy → **wedge radius**. | Wind direction is circular, so a polar layout matches the data and the reader's compass mental model, which a linear axis would break (N and NW would sit at opposite ends). It answers RQ2's comparison of sectors. |
+| *(not in table)* | **Median actual power** → a **solid line** over the scatter; the points are small and translucent. | 50,000 points overplot. The binned median summarises the actual curve, and translucency lets dense regions read darker. The gap between the solid median and the dashed theoretical line shows RQ1's plateau and RQ3's shortfall directly. |
 | *(not in table)* | **Theoretical power** → a **dashed line** on the scatter and on the monthly trend; actual power is solid. | RQ3 compares actual against theoretical. A shared position scale makes the gap directly readable, and line style separates expected from measured. |
-| *(not in table)* | Each sector keeps **one fixed hue in every view** (e.g. North is always blue). | The bar, scatter and line views are linked, so a colour has to mean the same sector everywhere. The palette was checked for colour-vision deficiency on adjacent pairs. |
+| *(not in table)* | The monthly trend's y-axis is **fixed from 0 to rated power** (3,600 kW). | A fixed domain keeps lines comparable when the selection changes, instead of rescaling the axis each time. |
 
 The rest matches the proposal: active power → y-position, wind speed → x-position, time (months) →
 x-position flowing left to right on a line, and a side-panel layout with a KPI row.
 
 ## Interaction
 
-- **Bar chart:** click a sector to select it in every view (it toggles the sidebar checkbox too).
+- **Wind rose:** click a wedge to select that sector in every view (it toggles the sidebar checkbox too).
 - **Power curve:** drag a box to brush a wind-speed / power range; the other views and the KPIs update.
 - **Monthly trend:** click a month or drag across several to filter the period.
 - **Sidebar:** direction checkboxes, month range, performance mode and threshold, and **Reset all**.
-- **KPI row and reading count:** always summarise the readings that match every active filter.
+- **KPI row and reading count:** always summarise the readings that match every active filter. The page opens on
+  the full year; if the filters leave fewer than 500 readings, or none, a highlighted message says so and points to
+  **Reset all**.
 - Every chart has hover tooltips; double-click a chart to clear its brush.
 
 ## Deployment (Render)
