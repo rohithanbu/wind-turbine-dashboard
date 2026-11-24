@@ -8,8 +8,11 @@ It has three linked views (power curve, wind rose, monthly trend) with cross-fil
 
 **Repository:** https://github.com/rohithanbu/wind-turbine-dashboard
 
-![Default view](screenshots/dashboard-default.png)
-![Cross-filtered: North-east sector, underperforming readings only](screenshots/dashboard-filtered.png)
+### Annotated screenshots
+
+![1 · Overview: three linked views and a KPI row](screenshots/annotated-1-overview.png)
+![2 · Linked selection: clicking the North-east wedge updates every view](screenshots/annotated-2-linked-selection.png)
+![3 · Finding anomalies: underperforming readings plus a brush on the power curve](screenshots/annotated-3-finding-anomalies.png)
 
 ## Run locally
 
@@ -28,6 +31,8 @@ Then open **http://127.0.0.1:8050** in a browser. Press `Ctrl+C` in the terminal
 
 - The dataset (`data/T1.csv`) is included in the repository, so no Kaggle account or download is needed.
   To fetch a fresh copy from Kaggle instead, run `python scripts/download_data.py`.
+- The page loads the Dash and Plotly JavaScript from their public CDN (faster than serving it from the app), so the
+  browser needs an internet connection.
 - If port 8050 is already in use, stop the other process, or change the port in `app.py`: `app.run(debug=True, port=8051)`.
 - On macOS/Linux, use `python3` in place of `python` if `python` isn't found.
 
@@ -180,13 +185,16 @@ All preparation is in [`dashboard/data.py`](dashboard/data.py):
 
 | Data | Type | Mark | Channel | View |
 |---|---|---|---|---|
-| Active power | Quantitative | Point / wedge / line | Y-position (fixed 0 to rated power); wedge radius on the wind rose | All three |
+| Active power | Quantitative | Point / wedge / line | Y-position (fixed 0 to rated power); on the wind rose, wedge **area** (radius on a square-root scale) | All three |
 | Median active power | Quantitative (aggregated) | Line | Position, **solid** line over the points | Power curve |
 | Wind speed | Quantitative | Point | X-position | Power curve |
 | Theoretical power | Quantitative | Line | Position, **dashed** line style | Power curve, monthly trend |
 | Wind direction sector | Nominal, circular | Wedge | **Angle** (compass, N at the top, clockwise) | Wind rose |
-| Selected sectors | Nominal | Point / wedge / line | **Colour hue** (fixed per sector, up to 3; one shared colour beyond that); everything unselected stays neutral grey | All three |
+| Selected sectors | Nominal | Point / wedge / line | **Colour hue** (fixed per sector, up to 3; one shared colour beyond that), backed by a dark **outline** on the selected wedges and a **marker shape** per sector on the monthly lines; everything unselected stays neutral grey | All three |
 | Month | Ordinal | Line | X-position, left to right | Monthly trend |
+
+Legends stay at six items or fewer, and each card title is a sentence about the data in view (for example
+"Output levels off at about 12.5 m/s") that updates with the filters; the subtitle says what the chart encodes.
 
 ## Changes from the proposal
 
@@ -195,7 +203,8 @@ The channel justification table in the proposal is followed, with these changes:
 | Proposal | Implementation | Reason |
 |---|---|---|
 | Wind direction → **colour hue** on the scatter points | Everything is one **neutral grey by default**. Hue appears only as a **highlight for the sectors the user selects** (up to 3), in every view; with more than 3 selected, the selection shares one colour. | Eight hues on ~50,000 overlapping points can't be told apart, especially by colour-blind viewers, and colour noise hides the power-curve shape that RQ1 asks about. One neutral hue plus a highlight keeps hue for identity only (expressiveness), and only where it can be read. |
-| *(not in table)* | **New wind rose:** wind direction sector → **angle** (compass layout, N at the top, clockwise); mean power or energy → **wedge radius**. | Wind direction is circular, so a polar layout matches the data and the reader's compass mental model, which a linear axis would break (N and NW would sit at opposite ends). It answers RQ2's comparison of sectors. |
+| *(not in table)* | **New wind rose:** wind direction sector → **angle** (compass layout, N at the top, clockwise); mean power or energy → **wedge area**, using a square-root radius. | Wind direction is circular, so a polar layout matches the data and the reader's compass mental model, which a linear axis would break (N and NW would sit at opposite ends). Readers judge wedges by area (Stevens' power law), and with a linear radius the area would grow with the square of the value and exaggerate the differences. It answers RQ2's comparison of sectors. |
+| *(not in table)* | **Redundant cues for the selection:** a dark outline on selected wedges, and a distinct marker shape per sector on the monthly lines. | Colour alone fails in greyscale and for some colour-vision deficiencies; outline and shape keep the selection readable without hue. |
 | *(not in table)* | **Median actual power** → a **solid line** over the scatter; the points are small and translucent. | 50,000 points overplot. The binned median summarises the actual curve, and translucency lets dense regions read darker. The gap between the solid median and the dashed theoretical line shows RQ1's plateau and RQ3's shortfall directly. |
 | *(not in table)* | **Theoretical power** → a **dashed line** on the scatter and on the monthly trend; actual power is solid. | RQ3 compares actual against theoretical. A shared position scale makes the gap directly readable, and line style separates expected from measured. |
 | *(not in table)* | The monthly trend's y-axis is **fixed from 0 to rated power** (3,600 kW). | A fixed domain keeps lines comparable when the selection changes, instead of rescaling the axis each time. |
@@ -213,6 +222,16 @@ x-position flowing left to right on a line, and a side-panel layout with a KPI r
   the full year; if the filters leave fewer than 500 readings, or none, a highlighted message says so and points to
   **Reset all**.
 - Every chart has hover tooltips; double-click a chart to clear its brush.
+- While a view or KPI recomputes it dims briefly and fades back in with the new state, so every linked update is
+  visible (the fade is turned off when the system asks for reduced motion).
+
+## Layout
+
+The layout follows a Z-pattern: title and reading count first, then the KPI row, then the views. Each view sits in its
+own card (enclosure), the two views that share the wind-speed / direction question sit side by side above the
+full-width time view (proximity), and a sector keeps the same colour in every view (similarity). All filters live in
+one sidebar panel with **Reset all** at the top. Below about 1,200 px wide the views stack; below about 860 px the
+sidebar moves above them, and the layout works down to phone width without horizontal scrolling.
 
 ## Deployment (Render)
 
@@ -234,5 +253,15 @@ assets/style.css        tokens, layout grid, responsive breakpoints
 data/T1.csv             the dataset
 scripts/download_data.py
 render.yaml             Render deployment config
-screenshots/            images used in this README
+screenshots/            annotated screenshots used in this README
 ```
+
+## Credits and references
+
+- **Dataset:** *Wind Turbine Scada Dataset*, published on Kaggle by user `berkerisen`,
+  https://www.kaggle.com/datasets/berkerisen/wind-turbine-scada-dataset
+- **Libraries:** [Plotly Dash](https://dash.plotly.com/) and [Plotly](https://plotly.com/python/) (charts and
+  interactivity), [pandas](https://pandas.pydata.org/) and [NumPy](https://numpy.org/) (data preparation),
+  [kagglehub](https://github.com/Kaggle/kagglehub) (dataset download).
+- **Cross-filtering pattern:** based on the "Interactive Visualizations" chapter of the Dash documentation
+  (`selectedData` / `clickData` driving the other figures), https://dash.plotly.com/interactive-graphing

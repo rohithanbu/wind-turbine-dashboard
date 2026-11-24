@@ -146,6 +146,17 @@ h1, h2, h3, p { margin: 0; }
 .segmented label:has(input:checked) { background: var(--page); color: var(--ink); font-weight: 600; }
 .segmented label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
 
+/* --- Update feedback ---------------------------------------------------- */
+/* While a view or KPI is recomputing, Dash marks it data-dash-is-loading; it dims and
+   then fades back in with the new state, so every linked view visibly transitions. */
+.graph-box > div, .kpi-value, .card-header h2 { transition: opacity 220ms ease-out; }
+.graph-box > div[data-dash-is-loading="true"],
+.kpi-value[data-dash-is-loading="true"],
+.card-header h2[data-dash-is-loading="true"] { opacity: 0.45; }
+@media (prefers-reduced-motion: reduce) {
+  .graph-box > div, .kpi-value, .card-header h2 { transition: none; }
+}
+
 /* --- Responsive --------------------------------------------------------- */
 @media (max-width: 1200px) {
   .chart-grid { grid-template-columns: minmax(0, 1fr); }

@@ -17,7 +17,10 @@ from dash.exceptions import PreventUpdate
 
 from .config import DEFAULT_PERF_THRESHOLD, LOW_COUNT_WARNING, SECTORS
 from .data import Filters, load_data, theoretical_curve
-from .figures import compute_kpis, line_figure, rose_figure, scatter_figure
+from .figures import (
+    compute_kpis, line_figure, line_title, plateau_wind_speed, power_curve_title, rose_figure,
+    rose_title, scatter_figure, sector_summary,
+)
 
 # The full filter state, in Filters.from_inputs argument order.
 FILTER_INPUTS = [
@@ -32,6 +35,12 @@ FILTER_INPUTS = [
 def register_callbacks(app: Dash) -> None:
     df = load_data()
     curve = theoretical_curve()
+
+    # Warm-up: Plotly imports its validators lazily on first use (about a second), so
+    # build each figure once at start-up instead of on the first visitor's request.
+    scatter_figure(df.head(2000), curve, (), None)
+    line_figure(df, (), (1, 12))
+    rose_figure(sector_summary(df), (), "mean")
 
     # --- Selections -> filter state ----------------------------------------
 
@@ -123,7 +132,7 @@ def register_callbacks(app: Dash) -> None:
 
     # --- Filter state -> views --------------------------------------------
 
-    @app.callback(Output("scatter-chart", "figure"), *FILTER_INPUTS)
+    @app.callback(Output("scatter-chart", "figure"), Output("scatter-title", "children"), *FILTER_INPUTS)
     def update_scatter(sectors, months, scatter_range, perf_mode, threshold):
         # The user's own brush is already drawn by Plotly; re-rendering 15k
         # points just to redraw it would only add lag.
@@ -132,21 +141,25 @@ def register_callbacks(app: Dash) -> None:
         filters = Filters.from_inputs(sectors, months, scatter_range, perf_mode, threshold)
         view = filters.without("scatter").without("sector").apply(df)
         # A median or plateau of underperforming readings alone isn't the turbine's curve.
-        return scatter_figure(view, curve, filters.sectors, scatter_range,
-                              show_summary=filters.perf_mode != "under")
+        typical = filters.perf_mode != "under"
+        plateau = plateau_wind_speed(view) if typical else None
+        figure = scatter_figure(view, curve, filters.sectors, scatter_range,
+                                plateau=plateau, show_median=typical)
+        return figure, power_curve_title(plateau, filters.perf_mode)
 
-    @app.callback(Output("line-chart", "figure"), *FILTER_INPUTS)
+    @app.callback(Output("line-chart", "figure"), Output("line-title", "children"), *FILTER_INPUTS)
     def update_line(sectors, months, scatter_range, perf_mode, threshold):
         filters = Filters.from_inputs(sectors, months, scatter_range, perf_mode, threshold)
         # Sectors split the line into one series each rather than filtering.
         view = filters.without("month").without("sector").apply(df)
-        return line_figure(view, filters.sectors, filters.months)
+        return line_figure(view, filters.sectors, filters.months), line_title(view, filters.sectors)
 
-    @app.callback(Output("rose-chart", "figure"), *FILTER_INPUTS, Input("rose-metric", "value"))
+    @app.callback(Output("rose-chart", "figure"), Output("rose-title", "children"),
+                  *FILTER_INPUTS, Input("rose-metric", "value"))
     def update_rose(sectors, months, scatter_range, perf_mode, threshold, metric):
         filters = Filters.from_inputs(sectors, months, scatter_range, perf_mode, threshold)
-        view = filters.without("sector").apply(df)
-        return rose_figure(view, filters.sectors, metric)
+        summary = sector_summary(filters.without("sector").apply(df))
+        return rose_figure(summary, filters.sectors, metric), rose_title(summary, metric)
 
     @app.callback(
         Output("kpi-energy", "children"),
@@ -165,8 +178,10 @@ def register_callbacks(app: Dash) -> None:
         css = "reading-count"
         # Empty state: say so plainly instead of leaving a near-empty dashboard unexplained.
         if view.empty:
-            count, css = "No readings match the current filters. Use Reset all to start over.", css + " is-warning"
+            count = "No readings match the current filters. Use Reset all to start over."
+            css += " is-warning"
         elif len(view) < LOW_COUNT_WARNING:
-            count += " (very few match the current filters, so results may not be representative; use Reset all to see the full year)"
+            count += (" (very few match the current filters, so results may not be representative;"
+                      " use Reset all to see the full year)")
             css += " is-warning"
         return kpis["energy"], kpis["max_wind"], kpis["active"], kpis["efficiency"], count, css

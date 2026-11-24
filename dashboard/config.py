@@ -25,6 +25,8 @@ SECTOR_NAMES = {
 
 MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
                 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July",
+               "August", "September", "October", "November", "December"]
 
 # --- Performance definition -------------------------------------------------
 # A reading is "underperforming" when actual output falls below a share of the
@@ -42,7 +44,6 @@ MAX_SCATTER_POINTS = 15_000
 MAX_HUED_SECTORS = 3
 # Below this many matching readings the header warns that the results may be unrepresentative.
 LOW_COUNT_WARNING = 500
-
 # --- Colour system ----------------------------------------------------------
 # Categorical slots in fixed order (validated for colour-vision deficiency on
 # adjacent pairs), used only for *selected* sectors - unselected data stays neutral.
@@ -56,6 +57,13 @@ SECTOR_COLORS = dict(zip(SECTORS, [
     "#008300",  # SW green
     "#6250d6",  # W  violet
     "#e34948",  # NW red
+]))
+
+# Redundant shape per sector for the monthly lines, so a selected sector is still
+# identifiable without colour (greyscale printouts, colour-vision deficiency).
+SECTOR_SYMBOLS = dict(zip(SECTORS, [
+    "circle", "square", "diamond", "triangle-up",
+    "triangle-down", "pentagon", "hexagon", "star",
 ]))
 
 COLORS = {

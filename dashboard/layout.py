@@ -18,12 +18,14 @@ def _kpi(kpi_id: str, label: str, hint: str) -> html.Div:
     ])
 
 
-def _card(title: str, subtitle: str, graph: dcc.Graph, *, controls=None,
+def _card(title_id: str, subtitle: str, graph: dcc.Graph, *, controls=None,
           class_name: str = "", tall: bool = False) -> html.Section:
+    # The title is filled by a callback with an insight about the data in view;
+    # the subtitle says what the chart encodes and how to interact with it.
     # A responsive dcc.Graph fills 100% of its parent, so the sized box is the wrapper.
     return html.Section(className=f"card {class_name}".strip(), children=[
         html.Div(className="card-header", children=[
-            html.Div([html.H2(title), html.P(subtitle, className="card-subtitle")]),
+            html.Div([html.H2(id=title_id), html.P(subtitle, className="card-subtitle")]),
             controls,
         ]),
         html.Div(graph, className="graph-box graph-box-tall" if tall else "graph-box"),
@@ -115,12 +117,12 @@ def build_layout(df: pd.DataFrame) -> html.Div:
                     _kpi("kpi-efficiency", "Actual / theoretical", "Energy vs. manufacturer curve"),
                 ]),
                 html.Div(className="chart-grid", children=[
-                    _card("Power curve", "Active power vs. wind speed · drag a box to brush",
+                    _card("scatter-title", "Power curve: active power vs. wind speed · drag a box to brush",
                           dcc.Graph(id="scatter-chart",
                                     config={**GRAPH_CONFIG,
                                             "modeBarButtonsToRemove": ["lasso2d", "autoScale2d"]}),
                           class_name="card-scatter", tall=True),
-                    _card("Output by wind direction", "Wind rose · click a wedge to select a sector",
+                    _card("rose-title", "Wind rose: output by wind direction · click a wedge to select it",
                           dcc.Graph(id="rose-chart",
                                     config={**GRAPH_CONFIG, "displayModeBar": False}),
                           controls=dcc.RadioItems(
@@ -128,7 +130,7 @@ def build_layout(df: pd.DataFrame) -> html.Div:
                               options=[{"label": "Mean kW", "value": "mean"},
                                        {"label": "Energy", "value": "energy"}]),
                           class_name="card-bar", tall=True),
-                    _card("Monthly trend", "Mean active power by month · drag across months to brush",
+                    _card("line-title", "Monthly trend: mean active power by month · drag across months to brush",
                           dcc.Graph(id="line-chart",
                                     config={**GRAPH_CONFIG, "displayModeBar": False}),
                           class_name="card-line"),
