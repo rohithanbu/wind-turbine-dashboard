@@ -212,6 +212,17 @@ The channel justification table in the proposal is followed, with these changes:
 The rest matches the proposal: active power → y-position, wind speed → x-position, time (months) →
 x-position flowing left to right on a line, and a side-panel layout with a KPI row.
 
+## Changes after usability testing
+
+Three peers who had not seen the dataset (P1–P3) each did three think-aloud tasks, one per research question.
+All three finished every task, one with a hint. These changes came out of the sessions:
+
+| What testers ran into | Change |
+|---|---|
+| Two of three first answered the energy question from the default **Mean kW** view: the small, faint switch was easy to miss (P1, P3). | The wind-rose switch is now labelled **Show**, larger, outlined, and the active option is filled dark. |
+| The **How to explore** guide helped, but sat at the bottom of the sidebar where it was easy to miss (P2). | The guide moved to the top of the sidebar, above the filters, in a tinted box, with a new line about the switch. |
+| Axis text was too small to read comfortably (P3). | Axis tick labels went from 11 to 13 px in a darker grey, axis titles from 12 to 14 px, and the wind-rose labels grew too. |
+
 ## Interaction
 
 - **Wind rose:** click a wedge to select that sector in every view (it toggles the sidebar checkbox too).
@@ -229,8 +240,8 @@ x-position flowing left to right on a line, and a side-panel layout with a KPI r
 
 The layout follows a Z-pattern: title and reading count first, then the KPI row, then the views. Each view sits in its
 own card (enclosure), the two views that share the wind-speed / direction question sit side by side above the
-full-width time view (proximity), and a sector keeps the same colour in every view (similarity). All filters live in
-one sidebar panel with **Reset all** at the top. Below about 1,200 px wide the views stack; below about 860 px the
+full-width time view (proximity), and a sector keeps the same colour in every view (similarity). The sidebar opens
+with a short **How to explore** guide, then all the filters in one panel with **Reset all** at the top. Below about 1,200 px wide the views stack; below about 860 px the
 sidebar moves above them, and the layout works down to phone width without horizontal scrolling.
 
 ## Deployment (Render)

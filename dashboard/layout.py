@@ -45,6 +45,19 @@ def _sidebar() -> html.Aside:
         for s in SECTORS
     ]
     return html.Aside(className="sidebar", children=[
+        # Usability testing: testers missed this guide at the bottom of the sidebar, so it
+        # now comes first, in a tinted box, above the filters.
+        html.Div(className="how-to", children=[
+            html.H3("How to explore"),
+            html.Ul([
+                html.Li("Drag a box on the power curve to brush a wind-speed / power range."),
+                html.Li("Click a wedge on the wind rose to highlight that direction in every view."),
+                html.Li(["Switch the wind rose between ", html.B("Mean kW"), " and ", html.B("Energy"),
+                         " with the buttons at its top right."]),
+                html.Li("Drag across months, or click one, to focus a period."),
+                html.Li("Double-click a chart to clear its brush."),
+            ]),
+        ]),
         html.Div(className="sidebar-header", children=[
             html.H2("Filters"),
             html.Button("Reset all", id="reset-button", className="reset-button", n_clicks=0),
@@ -79,15 +92,6 @@ def _sidebar() -> html.Aside:
                        tooltip={"placement": "bottom", "template": "{value}%"},
                        allow_direct_input=False),
         ),
-        html.Div(className="filter-group how-to", children=[
-            html.H3("How to explore"),
-            html.Ul([
-                html.Li("Drag a box on the power curve to brush a wind-speed / power range."),
-                html.Li("Click a wedge on the wind rose to highlight that direction in every view."),
-                html.Li("Drag across months, or click one, to focus a period."),
-                html.Li("Double-click a chart to clear its brush."),
-            ]),
-        ]),
     ])
 
 
@@ -125,10 +129,16 @@ def build_layout(df: pd.DataFrame) -> html.Div:
                     _card("rose-title", "Wind rose: output by wind direction · click a wedge to select it",
                           dcc.Graph(id="rose-chart",
                                     config={**GRAPH_CONFIG, "displayModeBar": False}),
-                          controls=dcc.RadioItems(
-                              id="rose-metric", value="mean", inline=True, className="segmented",
-                              options=[{"label": "Mean kW", "value": "mean"},
-                                       {"label": "Energy", "value": "energy"}]),
+                          # Usability testing: two of three testers first answered from the wrong
+                          # metric because they missed this switch, so it is now labelled and
+                          # drawn as a prominent button pair.
+                          controls=html.Div(className="metric-switch", children=[
+                              html.Span("Show", className="metric-switch-label"),
+                              dcc.RadioItems(
+                                  id="rose-metric", value="mean", inline=True, className="segmented",
+                                  options=[{"label": "Mean kW", "value": "mean"},
+                                           {"label": "Energy", "value": "energy"}]),
+                          ]),
                           class_name="card-bar", tall=True),
                     _card("line-title", "Monthly trend: mean active power by month · drag across months to brush",
                           dcc.Graph(id="line-chart",

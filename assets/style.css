@@ -11,6 +11,8 @@
   --hairline: rgba(11, 11, 11, 0.10);
   --grid: #e1e0d9;
   --accent: #2a78d6;
+  --help-bg: #f0efe9;
+  --help-border: #dcdad1;
   --radius: 10px;
   --gap: 16px;
   --font: system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -90,8 +92,14 @@ h1, h2, h3, p { margin: 0; }
 .perf-mode label { display: flex; align-items: center; gap: 6px; padding: 2px 0; cursor: pointer; }
 .perf-mode { margin-bottom: 8px; }
 
-.how-to ul { margin: 0; padding-left: 18px; color: var(--ink-secondary); font-size: 12px; }
-.how-to li + li { margin-top: 4px; }
+/* Usage guide: first thing in the sidebar, tinted so it reads as help, not a filter. */
+.how-to {
+  background: var(--help-bg); border: 1px solid var(--help-border);
+  border-left: 4px solid var(--ink); border-radius: 8px; padding: 12px 14px;
+}
+.how-to h3 { font-size: 14px; font-weight: 650; color: var(--ink); margin-bottom: 6px; }
+.how-to ul { margin: 0; padding-left: 18px; color: var(--ink); font-size: 13px; }
+.how-to li + li { margin-top: 5px; }
 
 /* --- KPI row (proximity: four related numbers in one band) --------------- */
 .kpi-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--gap); }
@@ -132,18 +140,26 @@ h1, h2, h3, p { margin: 0; }
 .graph-box { width: 100%; height: 300px; }
 .graph-box-tall { height: 420px; }
 
-/* Segmented toggle for the bar metric */
+/* Wind-rose metric switch. Testers missed a small, faint version of it, so it is labelled,
+   larger and outlined, and the active option is filled. Dark ink rather than a hue, because
+   hue is reserved for selected wind-direction sectors. */
+.metric-switch { display: flex; align-items: center; gap: 8px; flex: none; }
+.metric-switch-label { font-size: 13px; font-weight: 600; color: var(--ink-secondary); }
 .segmented {
-  display: inline-flex; border: 1px solid var(--hairline); border-radius: 6px;
-  overflow: hidden; flex: none;
+  display: inline-flex; border: 1.5px solid var(--ink); border-radius: 8px;
+  overflow: hidden; flex: none; box-shadow: 0 1px 3px rgba(11, 11, 11, 0.18);
 }
-.segmented label {
+/* Dash 4 gives inline options a right margin and a purple selected/hover colour; the
+   doubled class selectors override both. */
+.segmented .dash-options-list-option.dash-radioitems-inline {
   display: inline-flex; align-items: center; margin: 0;
-  padding: 3px 10px; font-size: 12px; color: var(--ink-secondary); cursor: pointer;
+  padding: 7px 16px; font-size: 14px; font-weight: 600; color: var(--ink); cursor: pointer;
 }
-.segmented label + label { border-left: 1px solid var(--hairline); }
+.segmented .dash-options-list-option + .dash-options-list-option { border-left: 1.5px solid var(--ink); }
+.segmented .dash-options-list-option.dash-radioitems-inline:hover { background: var(--help-bg); color: var(--ink); }
 .segmented input { position: absolute; opacity: 0; pointer-events: none; }
-.segmented label:has(input:checked) { background: var(--page); color: var(--ink); font-weight: 600; }
+.segmented .dash-options-list-option.dash-radioitems-inline.selected,
+.segmented .dash-options-list-option.dash-radioitems-inline.selected * { background: var(--ink); color: #fff; }
 .segmented label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 /* --- Update feedback ---------------------------------------------------- */
@@ -168,4 +184,5 @@ h1, h2, h3, p { margin: 0; }
   .kpi-value { font-size: 21px; }
   .sector-checklist { grid-template-columns: 1fr 1fr; }
   .graph-box-tall { height: 360px; }
+  .card-header { flex-wrap: wrap; }
 }

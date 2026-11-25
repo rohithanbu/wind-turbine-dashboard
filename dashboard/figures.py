@@ -26,8 +26,10 @@ def _base_layout(fig: go.Figure, *, x_title: str, y_title: str) -> go.Figure:
     axis = dict(
         showgrid=True, gridcolor=COLORS["grid"], gridwidth=1,
         linecolor=COLORS["axis"], zeroline=False, ticks="",
-        tickfont=dict(color=COLORS["muted"], size=11),
-        title=dict(font=dict(color=COLORS["ink_secondary"], size=12), standoff=8),
+        # Usability testing: a tester found the axis text too small, so ticks are 13 px
+        # (was 11) in a darker grey, and axis titles 14 px.
+        tickfont=dict(color=COLORS["ink_secondary"], size=13),
+        title=dict(font=dict(color=COLORS["ink"], size=14), standoff=8),
     )
     fig.update_layout(
         template="none",
@@ -354,14 +356,14 @@ def rose_figure(summary: pd.DataFrame, selected: tuple[str, ...], metric: str) -
             bgcolor=COLORS["surface"], bargap=0.06,
             angularaxis=dict(direction="clockwise", rotation=90, type="category",
                              linecolor=COLORS["axis"], gridcolor=COLORS["grid"],
-                             tickfont=dict(color=COLORS["ink_secondary"], size=12)),
+                             tickfont=dict(color=COLORS["ink"], size=14)),
             # Ticks sit at sqrt(value) but are labelled with the value itself.
             radialaxis=dict(range=[0, math.sqrt(vmax) * 1.05 if vmax else 1],
                             tickvals=[math.sqrt(t) for t in ticks],
                             ticktext=[f"{t:,.0f}" for t in ticks],
                             angle=67.5, tickangle=67.5, linecolor=COLORS["axis"],
                             gridcolor=COLORS["grid"], showline=False,
-                            tickfont=dict(color=COLORS["muted"], size=10)),
+                            tickfont=dict(color=COLORS["ink_secondary"], size=12)),
         ),
         annotations=[dict(text=f"{label} · wedge area is proportional to the value", showarrow=False,
                           xref="paper", yref="paper", x=0.5, y=-0.06, xanchor="center", yanchor="top",
